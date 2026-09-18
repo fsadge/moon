@@ -24,7 +24,7 @@ resize();
 window.addEventListener("resize", resize);
 
 // ========== 可自定义参数 ==========
-const DANMU_COUNT = 230;        // 弹幕数量
+const DANMU_COUNT = 260;        // 弹幕数量，统一后260更稳
 const TEXT_SEQUENCE = [
   "3","2","1",
   "中秋佳节快乐",
@@ -35,43 +35,52 @@ const TEXT_SEQUENCE = [
   "岁岁平安万事胜意",
   "好运满满"
 ];
-const TEXT_DURATION = 2400;     // 每个文字停留毫秒
-const PARTICLE_STEP = 3;        // 粒子密度，越小越密
+const TEXT_DURATION = 2200;     // 每个文字停留毫秒
+const PARTICLE_STEP = 4;        // 粒子密度，越小越密
 const DANMU_COLOR = "#ff88bb"; // 弹幕粉色
 const PARTICLE_COLOR = "#ffffff";
-const DANMU_SPEED_BASE = 2.4;   // 基础速度
-const GRADIENT_FADE_HEIGHT = 420; // 底部渐变消失区域高度
+
+// 弹幕统一样式参数
+const DANMU_FONT_SIZE = 20;
+const DANMU_SPEED = 2.8;        // 统一基础速度
+const DANMU_ALPHA = 0.65;       // 统一透明度
+const GRADIENT_FADE_HEIGHT = 320; // 底部渐变消失高度
+const STAGGER_DELAY = 0.016;    // 每个弹幕错开入场时间，秒
 // =================================
 
-// 弹幕对象：从上往下滚动，底部渐变消失
+// 弹幕对象：统一样式、分批入场、底部渐变消失
 class Danmu{
-  constructor(){
-    this.reset();
-  }
-  reset(){
+  constructor(index){
     this.text = "中秋快乐❤️";
     this.x = Math.random() * canvas.width;
-    this.y = -120 - Math.random() * 300;
-    this.speed = DANMU_SPEED_BASE + Math.random() * 3.6;
-    this.baseAlpha = 0.45 + Math.random() * 0.35;
+    this.speed = DANMU_SPEED + Math.random() * 0.6;
+    this.alpha = DANMU_ALPHA;
+
+    // 初始位置在屏幕外，按序号分批出现，避免刷新瞬间一堆
+    this.y = -150 - index * STAGGER_DELAY * DANMU_SPEED * 60;
+
+    this.font = `bold ${DANMU_FONT_SIZE}px "Microsoft YaHei", "PingFang SC", sans-serif`;
   }
+
   update(){
     this.y += this.speed;
 
-    // 滚出屏幕底部后重置
+    // 滚出底部后从顶部重新进入
     if(this.y > canvas.height + 150){
-      this.reset();
+      this.y = -150;
+      this.x = Math.random() * canvas.width;
     }
   }
+
   getCurrentAlpha(){
-    // 底部进入渐变区后逐渐消失
     const fadeStart = canvas.height - GRADIENT_FADE_HEIGHT;
     if(this.y > fadeStart){
       const progress = (this.y - fadeStart) / GRADIENT_FADE_HEIGHT;
-      return Math.max(0, this.baseAlpha - progress * this.baseAlpha);
+      return Math.max(0, this.alpha - progress * this.alpha);
     }
-    return this.baseAlpha;
+    return this.alpha;
   }
+
   draw(){
     const alpha = this.getCurrentAlpha();
     if(alpha <= 0) return;
@@ -79,9 +88,9 @@ class Danmu{
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = DANMU_COLOR;
-    ctx.font = "bold 22px sans-serif";
+    ctx.font = this.font;
     ctx.translate(this.x, this.y);
-    ctx.rotate(Math.PI / 2); // 竖排文字向下滚动
+    ctx.rotate(Math.PI / 2);
     ctx.fillText(this.text, 0, 0);
     ctx.restore();
   }
@@ -89,7 +98,7 @@ class Danmu{
 
 const danmus = [];
 for(let i = 0; i < DANMU_COUNT; i++){
-  danmus.push(new Danmu());
+  danmus.push(new Danmu(i));
 }
 
 // 粒子系统
@@ -104,12 +113,14 @@ class Particle{
     this.blink = Math.random() * Math.PI * 2;
     this.radius = 1.5 + Math.random() * 1.2;
   }
+
   setTarget(tx, ty){
     this.targetX = tx;
     this.targetY = ty;
     this.x = tx + (Math.random() - 0.5) * 220;
     this.y = ty + (Math.random() - 0.5) * 220;
   }
+
   update(){
     this.vx = (this.targetX - this.x) * 0.08;
     this.vy = (this.targetY - this.y) * 0.08;
@@ -117,6 +128,7 @@ class Particle{
     this.y += this.vy;
     this.blink += 0.06;
   }
+
   draw(){
     const a = 0.6 + 0.4 * Math.sin(this.blink);
     ctx.save();
@@ -169,20 +181,17 @@ function loop(time){
   ctx.fillStyle = "#000000";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // 更新绘制弹幕
   for(const d of danmus){
     d.update();
     d.draw();
   }
 
-  // 切换字幕
   if(time - lastSwitch > TEXT_DURATION){
     currentIndex = (currentIndex + 1) % TEXT_SEQUENCE.length;
     createTextParticles(TEXT_SEQUENCE[currentIndex]);
     lastSwitch = time;
   }
 
-  // 更新绘制粒子
   for(const p of particles){
     p.update();
     p.draw();
